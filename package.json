@@ -1,5 +1,5 @@
 {
-  "name": "[libraryName]",
+  "name": "@8xff/atm0s-media-react",
   "version": "0.0.0",
   "description": "",
   "cdn": "dist/index.umd.js",
@@ -28,6 +28,7 @@
     "@types/eslint": "^8.44.3",
     "@types/jest": "^29.5.5",
     "@types/prettier": "^3.0.0",
+    "@types/react": "^18.2.41",
     "@typescript-eslint/eslint-plugin": "^6.7.4",
     "@typescript-eslint/parser": "^6.7.4",
     "eslint": "^8.50.0",
@@ -53,15 +54,19 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/[repositoryOwner]/[repositoryName].git"
+    "url": "git+https://github.com/8xff/media-sdk-react.git"
   },
   "keywords": [],
   "author": {
-    "name": "[authorFullName]"
+    "name": "Luong Ngoc Minh"
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/[repositoryOwner]/[repositoryName]/issues"
+    "url": "https://github.com/8xff/media-sdk-react/issues"
   },
-  "homepage": "https://github.com/[repositoryOwner]/[repositoryName]#readme"
+  "homepage": "https://github.com/8xff/media-sdk-react#readme",
+  "dependencies": {
+    "@8xff/atm0s-media-js": "0.1.1-alpha.0",
+    "react": "^18.2.0"
+  }
 }

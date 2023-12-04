@@ -1,6 +1,6 @@
-[libraryNameWithSpacesAndUpperCases]
+Atm0s React SDK
 
-# [libraryNameWithSpacesAndUpperCases]
+# Atm0s React SDK
 
 ## Table of contents
 

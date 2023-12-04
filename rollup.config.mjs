@@ -22,7 +22,7 @@ const banner = `/*!
 function createOutputOptions(options) {
   return {
     banner,
-    name: '[libraryCamelCaseName]',
+    name: 'Atm0s',
     exports: 'named',
     sourcemap: true,
     ...options,
