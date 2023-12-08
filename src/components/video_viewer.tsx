@@ -1,6 +1,6 @@
 import { StreamRemote } from '@8xff/atm0s-media-js';
 import React from 'react';
-import { useConsumer, useLocalConsumer } from '../hooks';
+import { useConsumer, useLocalConsumer } from '../hooks/consumer';
 
 export const RemoteViewer = (props: { remote: StreamRemote; priority?: number }) => {
   const [ref, state] = useConsumer(props.remote, props.priority);

@@ -32,14 +32,12 @@ export class StreamPublisherWrap {
 
   switchStream(stream: MediaStream | null) {
     if (stream) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cachedKey = stream.cachedKey;
       if (cachedKey) {
         retainDevice(cachedKey);
       }
     }
     if (this.publisher.localStream) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cacheKey = this.publisher.localStream.cachedKey;
       if (cacheKey) {
         releaseDevice(cacheKey);
@@ -129,7 +127,6 @@ export const SessionProvider = (props: Props) => {
 
       config?.senders?.map((sender) => {
         if (sender.stream) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const cachedKey = sender.stream.cachedKey;
           if (cachedKey) {
             retainDevice(cachedKey);

@@ -34,6 +34,7 @@ function createOutputOptions(options) {
  */
 const options = {
   input: './src/index.ts',
+  external: ['react', '@8xff/atm0s-media-js'],
   output: [
     createOutputOptions({
       file: './dist/index.js',

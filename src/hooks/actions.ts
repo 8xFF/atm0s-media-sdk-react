@@ -9,12 +9,12 @@ interface Actions {
 }
 
 export const useActions = (): Actions => {
-  const { connect, disconnect } = useContext(SessionContext);
+  const { data, connect, disconnect } = useContext(SessionContext);
   return {
     connect,
     disconnect,
     playAudioMix: () => {
-      // data?.session.getMixMinusAudio()?.play();
+      data?.session.getMixMinusAudio()?.play();
     },
   };
 };

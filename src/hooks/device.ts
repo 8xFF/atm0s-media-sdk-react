@@ -1,5 +1,5 @@
-import { TypedEventEmitter } from '@8xff/atm0s-media-js/types/lib/utils/typed-event-emitter';
-import { getLogger } from '@8xff/atm0s-media-js/types/lib/utils/logger';
+import { TypedEventEmitter } from '@8xff/atm0s-media-js';
+import { getLogger } from '@8xff/atm0s-media-js';
 import { useEffect, useState } from 'react';
 
 const logger = getLogger('DeviceHook');
