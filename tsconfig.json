@@ -25,13 +25,15 @@
     // Type-checking settings.
     "lib": [
       "ES2020",
+      "ES2016",
+      "ESNext",
       "dom",
       "es5"
     ],
     "skipDefaultLibCheck": true,
     "skipLibCheck": true,
     "types": [
-      "jest"
+      "jest",
     ]
   },
   "include": [

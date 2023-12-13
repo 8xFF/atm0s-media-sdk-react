@@ -1,5 +1,5 @@
 import React from 'react';
-import Atm0s, { type AnyFunction, type IPublisherCallbacks } from '@8xff/atm0s-media-js';
+import { StreamPublisher, type AnyFunction, type IPublisherCallbacks, Session, StreamRemote, StreamConsumer, StreamConsumerPair, type ISessionConfig, type SenderConfig } from '@8xff/atm0s-media-js';
 export declare enum SessionState {
     New = "new",
     Connecting = "connecting",
@@ -10,23 +10,23 @@ export declare enum SessionState {
 }
 export declare class StreamPublisherWrap {
     private publisher;
-    constructor(publisher: Atm0s.StreamPublisher);
-    get state(): Atm0s.StreamSenderState;
+    constructor(publisher: StreamPublisher);
+    get state(): import("@8xff/atm0s-media-js").StreamSenderState;
     get localStream(): MediaStream | null | undefined;
     on(type: keyof IPublisherCallbacks, callback: AnyFunction): void;
     off(type: keyof IPublisherCallbacks, callback: AnyFunction): void;
     switchStream(stream: MediaStream | null): void;
 }
 interface SessionContainer {
-    session: Atm0s.Session;
+    session: Session;
     state: SessionState;
-    myAudioStreams: Atm0s.StreamRemote[];
-    myVideoStreams: Atm0s.StreamRemote[];
-    audioStreams: Atm0s.StreamRemote[];
-    videoStreams: Atm0s.StreamRemote[];
+    myAudioStreams: StreamRemote[];
+    myVideoStreams: StreamRemote[];
+    audioStreams: StreamRemote[];
+    videoStreams: StreamRemote[];
     publishers: Map<string, ArcContainer<StreamPublisherWrap>>;
-    consumers: Map<string, ArcContainer<Atm0s.StreamConsumer>>;
-    consumerPairs: Map<string, ArcContainer<Atm0s.StreamConsumerPair>>;
+    consumers: Map<string, ArcContainer<StreamConsumer>>;
+    consumerPairs: Map<string, ArcContainer<StreamConsumerPair>>;
 }
 interface ArcContainer<T> {
     data: T;
@@ -34,13 +34,13 @@ interface ArcContainer<T> {
 }
 interface SessionContextInfo {
     data?: SessionContainer;
-    connect: (url: string, config: Atm0s.ISessionConfig) => void;
+    connect: (url: string, config: ISessionConfig) => void;
     disconnect: () => void;
-    getPublisher(ownerId: number, cfg: Atm0s.SenderConfig): StreamPublisherWrap | undefined;
-    backPublisher(ownerId: number, cfg: Atm0s.SenderConfig): void;
-    getConsumer(ownerId: number, remote: Atm0s.StreamRemote): Atm0s.StreamConsumer | undefined;
-    backConsumer(owner_id: number, remote: Atm0s.StreamRemote): void;
-    getConsumerPair(ownerId: number, peerId: string, audioName: string, videoName: string): Atm0s.StreamConsumerPair | undefined;
+    getPublisher(ownerId: number, cfg: SenderConfig): StreamPublisherWrap | undefined;
+    backPublisher(ownerId: number, cfg: SenderConfig): void;
+    getConsumer(ownerId: number, remote: StreamRemote): StreamConsumer | undefined;
+    backConsumer(owner_id: number, remote: StreamRemote): void;
+    getConsumerPair(ownerId: number, peerId: string, audioName: string, videoName: string): StreamConsumerPair | undefined;
     backConsumerPair(ownerId: number, peerId: string, audioName: string, videoName: string): void;
     update: (new_info: SessionContainer) => void;
 }
@@ -48,7 +48,7 @@ export declare const SessionContext: React.Context<SessionContextInfo>;
 interface Props {
     children: React.ReactNode;
     url?: string;
-    config?: Atm0s.ISessionConfig;
+    config?: ISessionConfig;
 }
 export declare const SessionProvider: (props: Props) => React.JSX.Element;
 export {};

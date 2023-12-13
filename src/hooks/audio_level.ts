@@ -1,10 +1,8 @@
 import { useContext, useEffect, useState } from 'react';
-import Atm0s from '@8xff/atm0s-media-js';
+import { StreamConsumer, StreamConsumerPair } from '@8xff/atm0s-media-js';
 import { StreamPublisherWrap, BlueseaSessionContext } from '../components';
 
-export const useAudioLevelConsumer = (
-  consumer?: Atm0s.StreamConsumer | Atm0s.StreamConsumerPair,
-): number | undefined => {
+export const useAudioLevelConsumer = (consumer?: StreamConsumer | StreamConsumerPair): number | undefined => {
   const [audioLevel, setAudioLevel] = useState<number | undefined>(undefined);
   useEffect(() => {
     if (consumer) {

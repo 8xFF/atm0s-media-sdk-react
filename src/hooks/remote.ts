@@ -1,10 +1,10 @@
 import { useContext } from 'react';
 import { SessionContext } from '../components/provider';
-import Atm0s from '@8xff/atm0s-media-js';
+import { StreamKinds, StreamRemote } from '@8xff/atm0s-media-js';
 
-export const useRemoteStreams = (kind: Atm0s.StreamKinds, isMine?: boolean): Atm0s.StreamRemote[] => {
+export const useRemoteStreams = (kind: StreamKinds, isMine?: boolean): StreamRemote[] => {
   const { data } = useContext(SessionContext);
-  if (kind == Atm0s.StreamKinds.AUDIO) {
+  if (kind == StreamKinds.AUDIO) {
     if (isMine === true) {
       return data?.myAudioStreams || [];
     } else {
@@ -19,9 +19,9 @@ export const useRemoteStreams = (kind: Atm0s.StreamKinds, isMine?: boolean): Atm
   }
 };
 
-export const usePeerRemoteStreams = (peerId: string, kind: Atm0s.StreamKinds): Atm0s.StreamRemote[] => {
+export const usePeerRemoteStreams = (peerId: string, kind: StreamKinds): StreamRemote[] => {
   const { data } = useContext(SessionContext);
-  if (kind == Atm0s.StreamKinds.AUDIO) {
+  if (kind == StreamKinds.AUDIO) {
     return data?.audioStreams.filter((a) => a.peerId === peerId) || [];
   } else {
     return data?.videoStreams.filter((a) => a.peerId === peerId) || [];

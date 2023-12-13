@@ -1,14 +1,14 @@
 import { StreamRemote } from '@8xff/atm0s-media-js';
 import React from 'react';
-export declare const RemoteViewer: (props: {
+export declare const RemoteViewer: ({ remote, priority, ...others }: {
     remote: StreamRemote;
-    priority?: number;
-}) => React.JSX.Element;
-export declare const LocalViewer: (props: {
+    priority?: number | undefined;
+} & React.MediaHTMLAttributes<HTMLVideoElement>) => React.JSX.Element;
+export declare const LocalViewer: ({ stream, ...others }: {
     stream: MediaStream;
-}) => React.JSX.Element;
-export declare const VideoViewer: (props: {
+} & React.MediaHTMLAttributes<HTMLVideoElement>) => React.JSX.Element;
+export declare const VideoViewer: ({ stream, priority, ...others }: {
     stream: MediaStream | StreamRemote;
-    priority?: number;
-}) => React.JSX.Element;
+    priority?: number | undefined;
+} & React.MediaHTMLAttributes<HTMLVideoElement>) => React.JSX.Element;
 //# sourceMappingURL=video_viewer.d.ts.map

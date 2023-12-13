@@ -181,6 +181,11 @@ export const useUserMedia = (
           track.stop();
         });
       };
+    } else if (!active && res.media) {
+      res.media.getTracks().forEach((track) => {
+        track.stop();
+      });
+      setRes({ media: undefined, error: undefined });
     }
   }, [JSON.stringify(constraints), active]);
   return [res.media, res.error];

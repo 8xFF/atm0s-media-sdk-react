@@ -1,19 +1,19 @@
 import { useContext, useEffect, useMemo, useState, type LegacyRef } from 'react';
 import { SessionContext, SessionState } from '../components/provider';
-import Atm0s from '@8xff/atm0s-media-js';
 import { useSessionState } from './state';
+import { StreamRemote, StreamReceiverState, StreamConsumer, StreamConsumerPair } from '@8xff/atm0s-media-js';
 
 let idSeed = 0;
 export const useConsumer = (
-  remote?: Atm0s.StreamRemote,
+  remote?: StreamRemote,
   priority?: number,
   maxSpatial?: number,
   maxTemporal?: number,
-): [LegacyRef<HTMLVideoElement> | undefined, Atm0s.StreamReceiverState, Atm0s.StreamConsumer | undefined] => {
+): [LegacyRef<HTMLVideoElement> | undefined, StreamReceiverState, StreamConsumer | undefined] => {
   const consumerId = useMemo(() => idSeed++, []);
   const sessionState = useSessionState();
-  const [consumer, setConsumer] = useState<Atm0s.StreamConsumer>();
-  const [state, setState] = useState<Atm0s.StreamReceiverState>(Atm0s.StreamReceiverState.NoSource);
+  const [consumer, setConsumer] = useState<StreamConsumer>();
+  const [state, setState] = useState<StreamReceiverState>(StreamReceiverState.NoSource);
   const [element, setElement] = useState<HTMLVideoElement>();
   const { data, getConsumer, backConsumer } = useContext(SessionContext);
 
@@ -37,6 +37,7 @@ export const useConsumer = (
 
   useEffect(() => {
     if (element && consumer && isConnectionEstablished) {
+      console.log('try view here');
       element.srcObject = consumer.view('use-consumer-' + consumerId, priority, maxSpatial, maxTemporal);
       return () => {
         element.srcObject = null;
@@ -65,15 +66,15 @@ export const useConsumerPair = (
   priority?: number,
   maxSpatial?: number,
   maxTemporal?: number,
-): [LegacyRef<HTMLVideoElement> | undefined, Atm0s.StreamReceiverState, Atm0s.StreamConsumerPair | undefined] => {
+): [LegacyRef<HTMLVideoElement> | undefined, StreamReceiverState, StreamConsumerPair | undefined] => {
   const consumerId = useMemo(() => idSeed++, []);
   const sessionState = useSessionState();
-  const [consumer, setConsumer] = useState<Atm0s.StreamConsumerPair>();
-  const [state, setState] = useState<Atm0s.StreamReceiverState>(Atm0s.StreamReceiverState.NoSource);
+  const [consumer, setConsumer] = useState<StreamConsumerPair>();
+  const [state, setState] = useState<StreamReceiverState>(StreamReceiverState.NoSource);
   const [element, setElement] = useState<HTMLVideoElement>();
-  const { data, getConsumerPair: getConsumerPair, backConsumerPair: backConsumerPair } = useContext(SessionContext);
+  const { data, getConsumerPair, backConsumerPair } = useContext(SessionContext);
 
-  const isConnectionEstablished = [SessionState.Connected, SessionState.Reconnecting].indexOf(sessionState) >= 0;
+  const isConnectionEstablished = [SessionState.Connected, SessionState.Reconnecting].includes(sessionState);
 
   useEffect(() => {
     if (data?.session) {
@@ -93,6 +94,7 @@ export const useConsumerPair = (
   useEffect(() => {
     if (element && consumer && isConnectionEstablished) {
       element.srcObject = consumer.view('use-consumer-' + consumerId, priority, maxSpatial, maxTemporal);
+      console.log('try view here', element.srcObject);
       return () => {
         element.srcObject = null;
         consumer.unview('use-consumer-' + consumerId);
