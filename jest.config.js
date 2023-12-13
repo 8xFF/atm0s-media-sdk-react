@@ -11,11 +11,13 @@ const options = {
       'ts-jest',
       {
         isolatedModules: true,
-        useESM: true
+        useESM: true,
       },
     ],
   },
-  resolver: 'ts-jest-resolver'
+  resolver: 'ts-jest-resolver',
+  collectCoverage: true,
+  coverageReporters: ['text', 'cobertura'],
 };
 
 module.exports = options;
