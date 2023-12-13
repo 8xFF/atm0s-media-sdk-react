@@ -39,27 +39,51 @@ const options = {
     createOutputOptions({
       file: './dist/index.js',
       format: 'commonjs',
+      globals: {
+        'react': 'React',
+        '@8xff/atm0s-media-js': 'Atm0s',
+      },
     }),
     createOutputOptions({
       file: './dist/index.cjs',
       format: 'commonjs',
+      globals: {
+        'react': 'React',
+        '@8xff/atm0s-media-js': 'Atm0s',
+      },
     }),
     createOutputOptions({
       file: './dist/index.mjs',
       format: 'esm',
+      globals: {
+        'react': 'React',
+        '@8xff/atm0s-media-js': 'Atm0s',
+      },
     }),
     createOutputOptions({
       file: './dist/index.esm.js',
       format: 'esm',
+      globals: {
+        'react': 'React',
+        '@8xff/atm0s-media-js': 'Atm0s',
+      },
     }),
     createOutputOptions({
       file: './dist/index.umd.js',
       format: 'umd',
+      globals: {
+        'react': 'React',
+        '@8xff/atm0s-media-js': 'Atm0s',
+      },
     }),
     createOutputOptions({
       file: './dist/index.umd.min.js',
       format: 'umd',
       plugins: [terser()],
+      globals: {
+        'react': 'React',
+        '@8xff/atm0s-media-js': 'Atm0s',
+      },
     }),
   ],
   plugins: [
