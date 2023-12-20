@@ -1,62 +1,76 @@
-import { useContext, useEffect, useMemo, useState, type LegacyRef } from 'react';
-import { SessionContext, SessionState } from '../components/provider';
-import { useSessionState } from './state';
-import { StreamRemote, StreamReceiverState, StreamConsumer, StreamConsumerPair } from '@8xff/atm0s-media-js';
+import { useContext, useEffect, useMemo, useState } from 'react';
+import { SessionContext } from '../components/provider';
+import {
+  StreamRemote,
+  StreamReceiverState,
+  StreamConsumer,
+  StreamKinds,
+  StreamConsumerPair,
+  type RemoteStreamQuality,
+} from '@8xff/atm0s-media-js';
+import type { MediaStream2 } from '../platform';
 
 let idSeed = 0;
 export const useConsumer = (
-  remote?: StreamRemote,
+  remote: StreamRemote,
   priority?: number,
+  minSpatial?: number,
   maxSpatial?: number,
+  minTemporal?: number,
   maxTemporal?: number,
-): [LegacyRef<HTMLVideoElement> | undefined, StreamReceiverState, StreamConsumer | undefined] => {
+) => {
   const consumerId = useMemo(() => idSeed++, []);
-  const sessionState = useSessionState();
-  const [consumer, setConsumer] = useState<StreamConsumer>();
-  const [state, setState] = useState<StreamReceiverState>(StreamReceiverState.NoSource);
-  const [element, setElement] = useState<HTMLVideoElement>();
-  const { data, getConsumer, backConsumer } = useContext(SessionContext);
-
-  const isConnectionEstablished = [SessionState.Connected, SessionState.Reconnecting].indexOf(sessionState) >= 0;
+  const { getConsumer, backConsumer } = useContext(SessionContext);
+  const consumer = useMemo(() => {
+    return getConsumer(consumerId, remote);
+  }, [remote?.peerId, remote?.name]);
 
   useEffect(() => {
-    if (data?.session && remote) {
-      const consumer = getConsumer(consumerId, remote);
-      if (consumer) {
-        consumer.on('state', setState);
-        setState(consumer.state);
-        setConsumer(consumer);
-        return () => {
-          consumer?.unview('use-consumer-' + consumerId);
-          consumer?.off('state', setState);
-          backConsumer(consumerId, remote);
-        };
+    consumer.view('use-consumer-' + consumerId, priority, minSpatial, maxSpatial, minTemporal, maxTemporal);
+    return () => {
+      consumer.unview('use-consumer-' + consumerId);
+      backConsumer(consumerId, remote);
+    };
+  }, [remote.peerId, remote.name]);
+
+  useEffect(() => {
+    const handler = (state: StreamReceiverState) => {
+      switch (state) {
+        case StreamReceiverState.Connecting:
+          break;
+        default:
+          consumer.limit('use-consumer-' + consumerId, priority, minSpatial, maxSpatial, minTemporal, maxTemporal);
       }
-    }
-  }, [data?.session, remote]);
+    };
+    handler(consumer.state);
+    consumer.on('state', handler);
 
-  useEffect(() => {
-    if (element && consumer && isConnectionEstablished) {
-      console.log('try view here');
-      element.srcObject = consumer.view('use-consumer-' + consumerId, priority, maxSpatial, maxTemporal);
-      return () => {
-        element.srcObject = null;
-        consumer.unview('use-consumer-' + consumerId);
-      };
-    }
-  }, [element, consumer, isConnectionEstablished]);
+    return () => {
+      consumer.off('state', handler);
+    };
+  }, [consumer, priority, minSpatial, maxSpatial, minTemporal, maxTemporal]);
 
-  useEffect(() => {
-    if (element && consumer && isConnectionEstablished) {
-      consumer.limit('use-consumer-' + consumerId, priority, maxSpatial, maxTemporal);
-    }
-  }, [element, consumer, isConnectionEstablished, priority, maxSpatial, maxTemporal]);
+  return consumer;
+};
 
-  const ref = (instance: HTMLVideoElement | null) => {
-    setElement(instance || undefined);
-  };
-
-  return [ref, state, consumer];
+export const useConsumerSingle = (
+  peerId: string,
+  stream: string,
+  kind: StreamKinds,
+  priority?: number,
+  minSpatial?: number,
+  maxSpatial?: number,
+  minTemporal?: number,
+  maxTemporal?: number,
+): StreamConsumer => {
+  return useConsumer(
+    new StreamRemote(kind, peerId, '0', stream),
+    priority,
+    minSpatial,
+    maxSpatial,
+    minTemporal,
+    maxTemporal,
+  );
 };
 
 export const useConsumerPair = (
@@ -64,55 +78,43 @@ export const useConsumerPair = (
   audioName: string,
   videoName: string,
   priority?: number,
+  minSpatial?: number,
   maxSpatial?: number,
+  minTemporal?: number,
   maxTemporal?: number,
-): [LegacyRef<HTMLVideoElement> | undefined, StreamReceiverState, StreamConsumerPair | undefined] => {
+) => {
   const consumerId = useMemo(() => idSeed++, []);
-  const sessionState = useSessionState();
-  const [consumer, setConsumer] = useState<StreamConsumerPair>();
-  const [state, setState] = useState<StreamReceiverState>(StreamReceiverState.NoSource);
-  const [element, setElement] = useState<HTMLVideoElement>();
-  const { data, getConsumerPair, backConsumerPair } = useContext(SessionContext);
-
-  const isConnectionEstablished = [SessionState.Connected, SessionState.Reconnecting].includes(sessionState);
+  const { getConsumerPair, backConsumerPair } = useContext(SessionContext);
+  const consumer = useMemo(() => {
+    return getConsumerPair(consumerId, peerId, audioName, videoName);
+  }, [peerId, audioName, videoName]);
 
   useEffect(() => {
-    if (data?.session) {
-      const consumer = getConsumerPair(consumerId, peerId, audioName, videoName);
-      if (consumer) {
-        consumer.on('state', setState);
-        setState(consumer.state);
-        setConsumer(consumer);
-        return () => {
-          consumer?.off('state', setState);
-          backConsumerPair(consumerId, peerId, audioName, videoName);
-        };
+    consumer.view('use-consumer-' + consumerId, priority, minSpatial, maxSpatial, minTemporal, maxTemporal);
+    return () => {
+      consumer.unview('use-consumer-' + consumerId);
+      backConsumerPair(consumerId, peerId, audioName, videoName);
+    };
+  }, [peerId, audioName, videoName]);
+
+  useEffect(() => {
+    const handler = (state: StreamReceiverState) => {
+      switch (state) {
+        case StreamReceiverState.Connecting:
+          break;
+        default:
+          consumer.limit('use-consumer-' + consumerId, priority, minSpatial, maxSpatial, minTemporal, maxTemporal);
       }
-    }
-  }, [data?.session, peerId, audioName, videoName]);
+    };
+    handler(consumer.state);
+    consumer.on('state', handler);
 
-  useEffect(() => {
-    if (element && consumer && isConnectionEstablished) {
-      element.srcObject = consumer.view('use-consumer-' + consumerId, priority, maxSpatial, maxTemporal);
-      console.log('try view here', element.srcObject);
-      return () => {
-        element.srcObject = null;
-        consumer.unview('use-consumer-' + consumerId);
-      };
-    }
-  }, [element, consumer, isConnectionEstablished]);
+    return () => {
+      consumer.off('state', handler);
+    };
+  }, [consumer, priority, minSpatial, maxSpatial, minTemporal, maxTemporal]);
 
-  useEffect(() => {
-    if (element && consumer && isConnectionEstablished) {
-      consumer.limit('use-consumer-' + consumerId, priority, maxSpatial, maxTemporal);
-    }
-  }, [element, consumer, isConnectionEstablished, priority, maxSpatial, maxTemporal]);
-
-  const ref = (instance: HTMLVideoElement | null) => {
-    setElement(instance || undefined);
-  };
-
-  return [ref, state, consumer];
+  return consumer;
 };
 
 export const useLocalConsumer = (stream?: MediaStream) => {
@@ -129,4 +131,53 @@ export const useLocalConsumer = (stream?: MediaStream) => {
   return (instance: HTMLVideoElement | null) => {
     setElement(instance || undefined);
   };
+};
+
+export const useConsumerState = (
+  consumer: StreamConsumerPair | StreamConsumer,
+): [StreamReceiverState, MediaStream2 | undefined] => {
+  const [state, setState] = useState(consumer.state);
+  const [, setHasTrack] = useState(() => !!consumer.stream && consumer.stream.getTracks().length > 0);
+
+  //Checking for ensure stream ready
+  useEffect(() => {
+    const stream = consumer.stream;
+    if (stream && stream.getTracks().length === 0) {
+      const checkTrack = () => {
+        if (stream.getTracks().length > 0) {
+          setHasTrack(true);
+        }
+      };
+      consumer.on('track_added', checkTrack);
+      return () => {
+        consumer.off('track_added', checkTrack);
+      };
+    } else {
+      return () => {};
+    }
+  }, [consumer.stream]);
+
+  useEffect(() => {
+    consumer.on('state', setState);
+    return () => {
+      consumer.off('state', setState);
+    };
+  }, [consumer]);
+
+  return [state, consumer.stream];
+};
+
+export const useConsumerQuality = (consumer: StreamConsumerPair | StreamConsumer): RemoteStreamQuality | undefined => {
+  const [quality, setQuality] = useState<RemoteStreamQuality | undefined>();
+
+  useEffect(() => {
+    const handler = (quality: RemoteStreamQuality | undefined) => {
+      setQuality(quality || undefined);
+    };
+    consumer.on('quality', handler);
+    return () => {
+      consumer.off('quality', handler);
+    };
+  }, [consumer]);
+  return quality;
 };

@@ -1,7 +1,1 @@
-export {
-  SessionProvider,
-  SessionContext as BlueseaSessionContext,
-  StreamPublisherWrap,
-  SessionState,
-} from './provider';
-export { VideoViewer, LocalViewer, RemoteViewer } from './video_viewer';
+export { SessionProvider, SessionContext, StreamPublisherWrap, SessionState } from './provider';

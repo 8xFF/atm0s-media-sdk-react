@@ -18,6 +18,13 @@ const options = {
   resolver: 'ts-jest-resolver',
   collectCoverage: true,
   coverageReporters: ['text', 'cobertura'],
+  globals: {
+    'ts-jest': {
+      tsconfig: {
+        jsx: 'react-jsx',
+      },
+    },
+  },
 };
 
 module.exports = options;

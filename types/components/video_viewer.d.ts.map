@@ -1,1 +1,0 @@
-{"version":3,"file":"video_viewer.d.ts","sourceRoot":"","sources":["../../src/components/video_viewer.tsx"],"names":[],"mappings":"AAAA,OAAO,EAAE,YAAY,EAAE,MAAM,sBAAsB,CAAC;AACpD,OAAO,KAAK,MAAM,OAAO,CAAC;AAG1B,eAAO,MAAM,YAAY;YAIZ,YAAY;;qEASxB,CAAC;AAEF,eAAO,MAAM,WAAW;YAGX,WAAW;qEAIvB,CAAC;AAEF,eAAO,MAAM,WAAW;YAIX,WAAW,GAAG,YAAY;;qEAMtC,CAAC"}

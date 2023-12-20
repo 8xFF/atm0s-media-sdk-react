@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   StreamPublisher,
   type AnyFunction,
@@ -7,12 +7,19 @@ import {
   StreamRemote,
   StreamConsumer,
   StreamConsumerPair,
-  StreamKinds,
   createSession,
-  type ISessionConfig,
   type SenderConfig,
+  LogLevel,
+  setLogLevel,
+  type RoomStats,
+  MixMinusMode,
+  Codecs,
+  BitrateControlMode,
+  LatencyMode,
 } from '@8xff/atm0s-media-js';
-import { releaseDevice, retainDevice } from '../hooks/device';
+import { DataContainer, MapContainer } from '../hooks/reaction';
+import { MediaStreamArc } from '../hooks/shared_device';
+import type { MediaStream2 } from '../platform';
 
 export enum SessionState {
   New = 'new',
@@ -24,6 +31,8 @@ export enum SessionState {
 }
 
 export class StreamPublisherWrap {
+  stream: MediaStreamArc | MediaStream2 | null = null;
+
   constructor(private publisher: StreamPublisher) {}
 
   get state() {
@@ -41,34 +50,37 @@ export class StreamPublisherWrap {
   off(type: keyof IPublisherCallbacks, callback: AnyFunction) {
     this.publisher.on(type, callback);
   }
-
-  switchStream(stream: MediaStream | null) {
-    if (stream) {
-      const cachedKey = stream.cachedKey;
-      if (cachedKey) {
-        retainDevice(cachedKey);
-      }
+  switchStream(stream: MediaStreamArc | MediaStream2 | undefined | null, label?: string) {
+    if (!!stream && stream instanceof MediaStreamArc) {
+      stream.retain();
     }
-    if (this.publisher.localStream) {
-      const cacheKey = this.publisher.localStream.cachedKey;
-      if (cacheKey) {
-        releaseDevice(cacheKey);
-      }
+    if (!!this.stream && this.stream instanceof MediaStreamArc) {
+      this.stream.release();
     }
-    return this.publisher.switch(stream);
+    this.stream = stream || null;
+    return this.publisher.switchStream(
+      (!!stream && stream instanceof MediaStreamArc ? stream?.stream : stream) || null,
+      label,
+    );
   }
 }
 
 interface SessionContainer {
   session: Session;
-  state: SessionState;
-  myAudioStreams: StreamRemote[];
-  myVideoStreams: StreamRemote[];
-  audioStreams: StreamRemote[];
-  videoStreams: StreamRemote[];
-  publishers: Map<string, ArcContainer<StreamPublisherWrap>>;
-  consumers: Map<string, ArcContainer<StreamConsumer>>;
-  consumerPairs: Map<string, ArcContainer<StreamConsumerPair>>;
+  state: DataContainer<SessionState>;
+  roomStats: DataContainer<RoomStats>;
+  myStreams: MapContainer<string, StreamRemote>;
+  remoteStreams: MapContainer<string, StreamRemote>;
+  peerStreams: MapContainer<string, StreamRemote[]>;
+  publishers: MapContainer<string, ArcContainer<StreamPublisherWrap>>;
+  consumers: MapContainer<string, ArcContainer<StreamConsumer>>;
+  consumerPairs: MapContainer<string, ArcContainer<StreamConsumerPair>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sharedData: MapContainer<string, any>;
+  connect: (onError?: (err: unknown) => void) => Promise<void>;
+  restartIce: () => Promise<void>;
+  disconnect: () => void;
+  destroy: () => void;
 }
 
 interface ArcContainer<T> {
@@ -77,418 +89,309 @@ interface ArcContainer<T> {
 }
 
 interface SessionContextInfo {
-  data?: SessionContainer;
-  connect: (url: string, config: ISessionConfig) => void;
-  disconnect: () => void;
-  getPublisher(ownerId: number, cfg: SenderConfig): StreamPublisherWrap | undefined;
+  data: SessionContainer;
+  getPublisher(ownerId: number, cfg: SenderConfig): StreamPublisherWrap;
   backPublisher(ownerId: number, cfg: SenderConfig): void;
-  getConsumer(ownerId: number, remote: StreamRemote): StreamConsumer | undefined;
-  backConsumer(owner_id: number, remote: StreamRemote): void;
-  getConsumerPair(
-    ownerId: number,
-    peerId: string,
-    audioName: string,
-    videoName: string,
-  ): StreamConsumerPair | undefined;
+  getConsumer(ownerId: number, remote: StreamRemote): StreamConsumer;
+  backConsumer(ownerId: number, remote: StreamRemote): void;
+  getConsumerPair(ownerId: number, peerId: string, audioName: string, videoName: string): StreamConsumerPair;
   backConsumerPair(ownerId: number, peerId: string, audioName: string, videoName: string): void;
-  update: (new_info: SessionContainer) => void;
 }
 
 export const SessionContext = React.createContext({} as SessionContextInfo);
 
+const StreamKey = (stream: StreamRemote) => {
+  return stream.peerId + '-' + stream.name;
+};
 interface Props {
   children: React.ReactNode;
-  // log_level?: LogLevel;
-  url?: string;
-  config?: ISessionConfig;
+  logLevel?: LogLevel;
+  autoConnect?: boolean;
+  onConnectError?: (err: unknown) => void;
+  gateways: string | string[];
+  room: string;
+  peer: string;
+  token: string;
+  mixMinusAudio?: {
+    elements?: [HTMLAudioElement, HTMLAudioElement, HTMLAudioElement];
+    mode: MixMinusMode;
+  };
+  latencyMode?: LatencyMode;
+  iceServers?: [
+    {
+      urls: string;
+      username?: string;
+      credential?: string;
+    },
+  ];
+  codecs?: Codecs[];
+  senders?: SenderConfig[];
+  receivers?: {
+    audio?: number;
+    video?: number;
+  };
+  bitrateControlMode?: BitrateControlMode;
 }
 
-let GlobalVer = 0;
-
 export const SessionProvider = (props: Props) => {
-  // if (props.log_level != undefined) {
-  //   setLogLevel(props.log_level);
-  // }
-  const [, setVer] = useState(0);
-  const storage = useMemo<{ data: SessionContainer | undefined }>(() => {
-    return { data: undefined };
-  }, []);
-  const update = useCallback(
-    (data: SessionContainer | undefined) => {
-      storage.data = data;
-      setVer(GlobalVer++);
-    },
-    [storage, setVer],
-  );
-  const connect = useCallback(
-    (url: string, config: ISessionConfig) => {
-      if (storage.data?.session) {
-        return () => {
-          storage.data?.session.disconnect();
-        };
-      }
-      const session = createSession(url, config);
-      const myAudioStreams = new Map<string, StreamRemote>();
-      const myVideoStreams = new Map<string, StreamRemote>();
-      const audioStreams = new Map<string, StreamRemote>();
-      const videoStreams = new Map<string, StreamRemote>();
+  if (props.logLevel) {
+    setLogLevel(props.logLevel);
+  }
+  const sessionContainer = useMemo<SessionContainer>(() => {
+    // logger.info("creating  session", props);
+    const session = createSession(props.gateways, {
+      roomId: props.room,
+      peerId: props.peer,
+      token: props.token,
+      senders: props.senders || [],
+      receivers: props.receivers || { audio: 1, video: 1 },
+      mixMinusAudio: props.mixMinusAudio,
+      latencyMode: props.latencyMode,
+      iceServers: props.iceServers,
+      bitrateControlMode: props.bitrateControlMode,
+      codecs: props.codecs,
+    });
+    const state = new DataContainer<SessionState>(SessionState.New);
+    const roomStats = new DataContainer<RoomStats>({ peers: 0 });
+    const myStreams = new MapContainer<string, StreamRemote>();
+    const remoteStreams = new MapContainer<string, StreamRemote>();
+    const peerStreams = new MapContainer<string, StreamRemote[]>();
+    const publishers = new MapContainer<string, ArcContainer<StreamPublisherWrap>>();
+    const consumers = new MapContainer<string, ArcContainer<StreamConsumer>>();
+    const consumerPairs = new MapContainer<string, ArcContainer<StreamConsumerPair>>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sharedData = new MapContainer<string, any>();
 
-      const publishers: Map<string, ArcContainer<StreamPublisherWrap>> = new Map();
-      const consumers: Map<string, ArcContainer<StreamConsumer>> = new Map();
-      const consumerPairs: Map<string, ArcContainer<StreamConsumerPair>> = new Map();
+    const onConnected = () => {
+      state.change(SessionState.Connected);
+    };
 
-      config?.senders?.map((sender) => {
-        if (sender.stream) {
-          const cachedKey = sender.stream.cachedKey;
-          if (cachedKey) {
-            retainDevice(cachedKey);
-          }
-        }
-      });
+    const onReconnecting = () => {
+      state.change(SessionState.Reconnecting);
+    };
 
-      session.on('connected', () => {
-        if (storage.data?.session != session) return;
-        update({
-          session,
-          state: SessionState.Connected,
-          myAudioStreams: Array.from(myAudioStreams.values()),
-          myVideoStreams: Array.from(myVideoStreams.values()),
-          audioStreams: Array.from(audioStreams.values()),
-          videoStreams: Array.from(videoStreams.values()),
-          publishers,
-          consumers,
-          consumerPairs,
-        });
-      });
+    const onReconnected = () => {
+      state.change(SessionState.Connected);
+    };
 
-      session.on('mystream_added', (stream: StreamRemote) => {
-        if (storage.data?.session != session) return;
-        const key = stream.peerId + '-' + stream.name;
-        if (stream.kind === StreamKinds.AUDIO) {
-          myAudioStreams.set(key, stream);
-        } else {
-          myVideoStreams.set(key, stream);
-        }
-        update({
-          session,
-          state: SessionState.Connected,
-          myAudioStreams: Array.from(myAudioStreams.values()),
-          myVideoStreams: Array.from(myVideoStreams.values()),
-          audioStreams: Array.from(audioStreams.values()),
-          videoStreams: Array.from(videoStreams.values()),
-          publishers,
-          consumers,
-          consumerPairs,
-        });
-      });
+    const onRoomStats = (_roomStats: RoomStats) => {
+      roomStats.change(_roomStats);
+    };
 
-      session.on('mystream_updated', (stream: StreamRemote) => {
-        if (storage.data?.session != session) return;
-        const key = stream.peerId + '-' + stream.name;
-        if (stream.kind === StreamKinds.AUDIO) {
-          myAudioStreams.set(key, stream);
-        } else {
-          myVideoStreams.set(key, stream);
-        }
-        update({
-          session,
-          state: SessionState.Connected,
-          myAudioStreams: Array.from(myAudioStreams.values()),
-          myVideoStreams: Array.from(myVideoStreams.values()),
-          audioStreams: Array.from(audioStreams.values()),
-          videoStreams: Array.from(videoStreams.values()),
-          publishers,
-          consumers,
-          consumerPairs,
-        });
-      });
+    const onMyStreamAdded = (stream: StreamRemote) => {
+      myStreams.set(StreamKey(stream), stream);
+      const list = (peerStreams.get(stream.peerId) || []).filter((s) => s.name !== stream.name);
+      peerStreams.set(stream.peerId, list.concat(stream));
+    };
 
-      session.on('mystream_removed', (stream: StreamRemote) => {
-        if (storage.data?.session != session) return;
-        const key = stream.peerId + '-' + stream.name;
-        if (stream.kind === StreamKinds.AUDIO) {
-          myAudioStreams.delete(key);
-        } else {
-          myVideoStreams.delete(key);
-        }
-        update({
-          session,
-          state: SessionState.Connected,
-          myAudioStreams: Array.from(myAudioStreams.values()),
-          myVideoStreams: Array.from(myVideoStreams.values()),
-          audioStreams: Array.from(audioStreams.values()),
-          videoStreams: Array.from(videoStreams.values()),
-          publishers,
-          consumers,
-          consumerPairs,
-        });
-      });
+    const onMyStreamRemoved = (stream: StreamRemote) => {
+      myStreams.del(StreamKey(stream));
+      const list = (peerStreams.get(stream.peerId) || []).filter((s) => s.name !== stream.name);
+      peerStreams.set(stream.peerId, list);
+    };
 
-      session.on('stream_added', (stream: StreamRemote) => {
-        if (storage.data?.session != session) return;
-        const key = stream.peerId + '-' + stream.name;
-        if (stream.kind === StreamKinds.AUDIO) {
-          audioStreams.set(key, stream);
-        } else {
-          videoStreams.set(key, stream);
-        }
-        update({
-          session,
-          state: SessionState.Connected,
-          myAudioStreams: Array.from(myAudioStreams.values()),
-          myVideoStreams: Array.from(myVideoStreams.values()),
-          audioStreams: Array.from(audioStreams.values()),
-          videoStreams: Array.from(videoStreams.values()),
-          publishers,
-          consumers,
-          consumerPairs,
-        });
-      });
+    const onStreamAdded = (stream: StreamRemote) => {
+      remoteStreams.set(StreamKey(stream), stream);
+      const list = (peerStreams.get(stream.peerId) || []).filter((s) => s.name !== stream.name);
+      peerStreams.set(stream.peerId, list.concat(stream));
+    };
 
-      session.on('stream_updated', (stream: StreamRemote) => {
-        if (storage.data?.session != session) return;
-        const key = stream.peerId + '-' + stream.name;
-        if (stream.kind === StreamKinds.AUDIO) {
-          audioStreams.set(key, stream);
-        } else {
-          videoStreams.set(key, stream);
-        }
-        update({
-          session,
-          state: SessionState.Connected,
-          myAudioStreams: Array.from(myAudioStreams.values()),
-          myVideoStreams: Array.from(myVideoStreams.values()),
-          audioStreams: Array.from(audioStreams.values()),
-          videoStreams: Array.from(videoStreams.values()),
-          publishers,
-          consumers,
-          consumerPairs,
-        });
-      });
+    const onStreamRemoved = (stream: StreamRemote) => {
+      remoteStreams.del(StreamKey(stream));
+      const list = (peerStreams.get(stream.peerId) || []).filter((s) => s.name !== stream.name);
+      peerStreams.set(stream.peerId, list);
+    };
 
-      session.on('stream_removed', (stream: StreamRemote) => {
-        if (storage.data?.session != session) return;
-        const key = stream.peerId + '-' + stream.name;
-        if (stream.kind === StreamKinds.AUDIO) {
-          audioStreams.delete(key);
-        } else {
-          videoStreams.delete(key);
-        }
-        update({
-          session,
-          state: SessionState.Connected,
-          myAudioStreams: Array.from(myAudioStreams.values()),
-          myVideoStreams: Array.from(myVideoStreams.values()),
-          audioStreams: Array.from(audioStreams.values()),
-          videoStreams: Array.from(videoStreams.values()),
-          publishers,
-          consumers,
-          consumerPairs,
-        });
-      });
+    const onDisconnected = () => {
+      state.change(SessionState.Disconnected);
+    };
 
-      session.on('disconnected', () => {
-        if (storage.data?.session != session) return;
-        update({
-          session,
-          state: SessionState.Disconnected,
-          myAudioStreams: Array.from(myAudioStreams.values()),
-          myVideoStreams: Array.from(myVideoStreams.values()),
-          audioStreams: Array.from(audioStreams.values()),
-          videoStreams: Array.from(videoStreams.values()),
-          publishers,
-          consumers,
-          consumerPairs,
-        });
-      });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const connect = async (onError?: (err: any) => void) => {
       session.connect().catch((err) => {
-        if (storage.data?.session != session) return;
-        console.error(err);
-        update({
-          session,
-          state: SessionState.Error,
-          myAudioStreams: Array.from(myAudioStreams.values()),
-          myVideoStreams: Array.from(myVideoStreams.values()),
-          audioStreams: Array.from(audioStreams.values()),
-          videoStreams: Array.from(videoStreams.values()),
-          publishers,
-          consumers,
-          consumerPairs,
-        });
+        state.change(SessionState.Error);
+        if (onError) {
+          onError(err);
+        }
       });
-      update({
-        session,
-        state: SessionState.Connecting,
-        myAudioStreams: [],
-        myVideoStreams: [],
-        audioStreams: [],
-        videoStreams: [],
-        publishers,
-        consumers,
-        consumerPairs,
-      });
-      return;
-    },
-    [storage, update],
-  );
 
-  const disconnect = useCallback(() => {
-    if (storage.data?.session) {
-      storage.data.session.disconnect();
-      update(undefined);
+      state.change(SessionState.Connecting);
+    };
+
+    const restartIce = () => {
+      return session.restartIce();
+    };
+
+    const disconnect = () => {
+      switch (state.value) {
+        case SessionState.Connecting:
+        case SessionState.Connected:
+          session.disconnect();
+          break;
+      }
+    };
+
+    const destroy = () => {
+      session.off('connected', onConnected);
+      session.off('reconnecting', onReconnecting);
+      session.off('reconnected', onReconnected);
+      session.off('room_stats', onRoomStats);
+      session.off('mystream_added', onMyStreamAdded);
+      session.off('mystream_removed', onMyStreamRemoved);
+      session.off('stream_added', onStreamAdded);
+      session.off('stream_removed', onStreamRemoved);
+      session.off('disconnected', onDisconnected);
+      sessionContainer.state.change(SessionState.Disconnected);
+    };
+    session.on('connected', onConnected);
+    session.on('reconnecting', onReconnecting);
+    session.on('reconnected', onReconnected);
+    session.on('room_stats', onRoomStats);
+    session.on('mystream_added', onMyStreamAdded);
+    session.on('mystream_removed', onMyStreamRemoved);
+    session.on('stream_added', onStreamAdded);
+    session.on('stream_removed', onStreamRemoved);
+    session.on('disconnected', onDisconnected);
+
+    if (typeof props.autoConnect === 'undefined' || props.autoConnect === true) {
+      connect(props.onConnectError);
     }
-  }, [storage, update]);
+
+    return {
+      session,
+      state,
+      roomStats,
+      myStreams,
+      remoteStreams,
+      peerStreams,
+      publishers,
+      consumers,
+      consumerPairs,
+      sharedData,
+      connect,
+      restartIce,
+      disconnect,
+      destroy,
+    };
+  }, [props.gateways, props.room, props.peer]);
+
+  useEffect(() => {
+    return sessionContainer.destroy;
+  }, [sessionContainer]);
 
   const getPublisher = useCallback(
     (ownerId: number, cfg: SenderConfig) => {
-      const data = storage.data;
-      if (data?.session) {
-        let publisher = data.publishers.get(cfg.name);
-        if (!publisher) {
-          publisher = {
-            data: new StreamPublisherWrap(
-              data.session.createPublisher({
-                stream: cfg.stream,
-                name: cfg.name,
-                kind: cfg.kind,
-                label: cfg.label,
-                preferredCodecs: cfg.preferredCodecs,
-                simulcast: cfg.simulcast,
-                maxBitrate: cfg.maxBitrate,
-                contentHint: cfg.contentHint,
-                screen: cfg.screen,
-              }),
-            ),
-            owners: new Map(),
-          };
-          data.publishers.set(cfg.name, publisher);
-        }
-        data.publishers.get(cfg.name)?.owners.set(ownerId, new Date().getTime());
-        return publisher.data;
+      let publisher = sessionContainer.publishers.get(cfg.name);
+      if (!publisher) {
+        publisher = {
+          data: new StreamPublisherWrap(
+            sessionContainer.session.createPublisher({
+              stream: cfg.stream,
+              name: cfg.name,
+              kind: cfg.kind,
+              preferredCodecs: cfg.preferredCodecs,
+              simulcast: cfg.simulcast,
+              maxBitrate: cfg.maxBitrate,
+              contentHint: cfg.contentHint,
+              screen: cfg.screen,
+            }),
+          ),
+          owners: new Map(),
+        };
+        sessionContainer.publishers.set(cfg.name, publisher);
       }
-      return undefined;
+      publisher.owners.set(ownerId, new Date().getTime());
+      return publisher.data;
     },
-    [storage],
+    [sessionContainer],
   );
 
   const backPublisher = useCallback(
     (ownerId: number, cfg: SenderConfig) => {
-      const data = storage.data;
-      if (data?.session) {
-        const publisher = data.publishers.get(cfg.name);
-        if (publisher) {
-          publisher.owners.delete(ownerId);
-          if (publisher.owners.size == 0) {
-            publisher.data.switchStream(null);
-            data.publishers.delete(cfg.name);
-          }
+      const publisher = sessionContainer.publishers.get(cfg.name);
+      if (publisher) {
+        publisher.owners.delete(ownerId);
+        if (publisher.owners.size === 0) {
+          publisher.data.switchStream(null);
+          sessionContainer.publishers.del(cfg.name);
         }
       }
-      return undefined;
     },
-    [storage],
+    [sessionContainer],
   );
 
   const getConsumer = useCallback(
     (ownerId: number, stream: StreamRemote) => {
-      const data = storage.data;
-      if (data?.session) {
-        const key = stream.peerId + '-' + stream.name;
-        let consumer = data.consumers.get(key);
-        if (!consumer) {
-          consumer = {
-            data: data.session.createConsumer(stream),
-            owners: new Map(),
-          };
-          data.consumers.set(key, consumer);
-        }
-        data.consumers.get(key)?.owners.set(ownerId, new Date().getTime());
-        return consumer.data;
+      const key = StreamKey(stream);
+      let consumer = sessionContainer.consumers.get(key);
+      if (!consumer) {
+        consumer = {
+          data: sessionContainer.session.createConsumer(stream),
+          owners: new Map(),
+        };
+        sessionContainer.consumers.set(key, consumer);
       }
-      return undefined;
+      consumer.owners.set(ownerId, new Date().getTime());
+      return consumer.data;
     },
-    [storage],
+    [sessionContainer],
   );
 
   const backConsumer = useCallback(
     (ownerId: number, stream: StreamRemote) => {
-      const data = storage.data;
-      if (data?.session) {
-        const key = stream.peerId + '-' + stream.name;
-        const consumer = data.consumers.get(key);
-        if (consumer) {
-          consumer.owners.delete(ownerId);
-          if (consumer.owners.size == 0) {
-            data.consumers.delete(key);
-          }
+      const key = StreamKey(stream);
+      const consumer = sessionContainer.consumers.get(key);
+      if (consumer) {
+        consumer.owners.delete(ownerId);
+        if (consumer.owners.size === 0) {
+          sessionContainer.consumers.del(key);
         }
       }
-      return undefined;
     },
-    [storage],
+    [sessionContainer],
   );
 
   const getConsumerPair = useCallback(
     (ownerId: number, peerId: string, audioName: string, videoName: string) => {
-      const data = storage.data;
-      if (data?.session) {
-        const key = peerId + '-' + audioName + '-' + videoName;
-        let consumer = data.consumerPairs.get(key);
-        if (!consumer) {
-          consumer = {
-            data: data.session.createConsumerPair(peerId, audioName, videoName),
-            owners: new Map(),
-          };
-          data.consumerPairs.set(key, consumer);
-        }
-        data.consumerPairs.get(key)?.owners.set(ownerId, new Date().getTime());
-        return consumer.data;
+      const key = peerId + '-' + audioName + '-' + videoName;
+      let consumer = sessionContainer.consumerPairs.get(key);
+      if (!consumer) {
+        consumer = {
+          data: sessionContainer.session.createConsumerPair(peerId, audioName, videoName),
+          owners: new Map(),
+        };
+        sessionContainer.consumerPairs.set(key, consumer);
       }
-      return undefined;
+      consumer.owners.set(ownerId, new Date().getTime());
+      return consumer.data;
     },
-    [storage],
+    [sessionContainer],
   );
 
   const backConsumerPair = useCallback(
     (ownerId: number, peerId: string, audioName: string, videoName: string) => {
-      const data = storage.data;
-      if (data?.session) {
-        const key = peerId + '-' + audioName + '-' + videoName;
-        const consumer = data.consumerPairs.get(key);
-        if (consumer) {
-          consumer.owners.delete(ownerId);
-          if (consumer.owners.size == 0) {
-            data.consumerPairs.delete(key);
-          }
+      const key = peerId + '-' + audioName + '-' + videoName;
+      const consumer = sessionContainer.consumerPairs.get(key);
+      if (consumer) {
+        consumer.owners.delete(ownerId);
+        if (consumer.owners.size === 0) {
+          sessionContainer.consumerPairs.del(key);
         }
       }
-      return undefined;
     },
-    [storage],
+    [sessionContainer],
   );
-
-  React.useEffect(() => {
-    if (props.url && props.config) {
-      connect(props.url, props.config);
-      return () => {
-        disconnect();
-      };
-    }
-  }, [props.url, props.config, connect, disconnect]);
 
   return (
     <SessionContext.Provider
       value={{
-        data: storage.data,
-        connect,
-        disconnect,
+        data: sessionContainer,
         getPublisher,
         backPublisher,
         getConsumer,
         backConsumer,
         getConsumerPair,
         backConsumerPair,
-        update,
       }}>
       {props.children}
     </SessionContext.Provider>

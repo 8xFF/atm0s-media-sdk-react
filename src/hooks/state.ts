@@ -1,7 +1,8 @@
 import { useContext } from 'react';
 import { SessionContext, SessionState } from '../components/provider';
+import { useReactionData } from './reaction';
 
 export const useSessionState = (): SessionState => {
   const { data } = useContext(SessionContext);
-  return data?.state || SessionState.New;
+  return useReactionData(data.state);
 };

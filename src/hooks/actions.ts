@@ -1,20 +1,21 @@
 import { useContext } from 'react';
 import { SessionContext } from '../components/provider';
-import type { ISessionConfig } from '@8xff/atm0s-media-js';
 
 interface Actions {
-  connect: (url: string, config: ISessionConfig) => void;
+  connect: () => Promise<void>;
+  restartIce: () => Promise<void>;
   disconnect: () => void;
   playAudioMix: () => void;
 }
 
 export const useActions = (): Actions => {
-  const { data, connect, disconnect } = useContext(SessionContext);
+  const { data } = useContext(SessionContext);
   return {
-    connect,
-    disconnect,
     playAudioMix: () => {
-      data?.session.getMixMinusAudio()?.play();
+      data.session.getMixMinusAudio()?.play();
     },
+    connect: data.connect,
+    restartIce: data.restartIce,
+    disconnect: data.disconnect,
   };
 };

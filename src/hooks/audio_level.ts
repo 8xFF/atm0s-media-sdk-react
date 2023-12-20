@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState } from 'react';
 import { StreamConsumer, StreamConsumerPair } from '@8xff/atm0s-media-js';
-import { StreamPublisherWrap, BlueseaSessionContext } from '../components';
+import { StreamPublisherWrap, SessionContext } from '../components';
 
 export const useAudioLevelConsumer = (consumer?: StreamConsumer | StreamConsumerPair): number | undefined => {
   const [audioLevel, setAudioLevel] = useState<number | undefined>(undefined);
@@ -48,7 +48,7 @@ export interface AudioMixSlotInfo {
 
 export const useAudioSlotMix = (slotIndex: number) => {
   const [slot, setSlot] = useState<AudioMixSlotInfo | undefined>(undefined);
-  const { data } = useContext(BlueseaSessionContext);
+  const { data } = useContext(SessionContext);
   useEffect(() => {
     const mixMinus = data?.session.getMixMinusAudio();
     if (mixMinus) {
@@ -77,7 +77,7 @@ export const useAudioSlotMix = (slotIndex: number) => {
 
 export const useAudioLevelMix = (peerId: string, streamName: string) => {
   const [audioLevel, setAudioLevel] = useState<number | undefined>(undefined);
-  const { data } = useContext(BlueseaSessionContext);
+  const { data } = useContext(SessionContext);
   useEffect(() => {
     const mixMinus = data?.session.getMixMinusAudio();
     if (mixMinus) {
