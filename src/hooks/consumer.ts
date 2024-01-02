@@ -7,18 +7,12 @@ import {
   StreamKinds,
   StreamConsumerPair,
   type RemoteStreamQuality,
+  type StreamLimit,
 } from '@8xff/atm0s-media-js';
 import type { MediaStream2 } from '../platform';
 
 let idSeed = 0;
-export const useConsumer = (
-  remote: StreamRemote,
-  priority?: number,
-  minSpatial?: number,
-  maxSpatial?: number,
-  minTemporal?: number,
-  maxTemporal?: number,
-) => {
+export const useConsumer = (remote: StreamRemote, limit?: StreamLimit) => {
   const consumerId = useMemo(() => idSeed++, []);
   const { getConsumer, backConsumer } = useContext(SessionContext);
   const consumer = useMemo(() => {
@@ -26,7 +20,7 @@ export const useConsumer = (
   }, [remote?.peerId, remote?.name]);
 
   useEffect(() => {
-    consumer.view('use-consumer-' + consumerId, priority, minSpatial, maxSpatial, minTemporal, maxTemporal);
+    consumer.view('use-consumer-' + consumerId, limit);
     return () => {
       consumer.unview('use-consumer-' + consumerId);
       backConsumer(consumerId, remote);
@@ -39,7 +33,7 @@ export const useConsumer = (
         case StreamReceiverState.Connecting:
           break;
         default:
-          consumer.limit('use-consumer-' + consumerId, priority, minSpatial, maxSpatial, minTemporal, maxTemporal);
+          if (limit) consumer.limit('use-consumer-' + consumerId, limit);
       }
     };
     handler(consumer.state);
@@ -48,7 +42,7 @@ export const useConsumer = (
     return () => {
       consumer.off('state', handler);
     };
-  }, [consumer, priority, minSpatial, maxSpatial, minTemporal, maxTemporal]);
+  }, [consumer, limit]);
 
   return consumer;
 };
@@ -57,32 +51,12 @@ export const useConsumerSingle = (
   peerId: string,
   stream: string,
   kind: StreamKinds,
-  priority?: number,
-  minSpatial?: number,
-  maxSpatial?: number,
-  minTemporal?: number,
-  maxTemporal?: number,
+  limit?: StreamLimit,
 ): StreamConsumer => {
-  return useConsumer(
-    new StreamRemote(kind, peerId, '0', stream),
-    priority,
-    minSpatial,
-    maxSpatial,
-    minTemporal,
-    maxTemporal,
-  );
+  return useConsumer(new StreamRemote(kind, peerId, '0', stream), limit);
 };
 
-export const useConsumerPair = (
-  peerId: string,
-  audioName: string,
-  videoName: string,
-  priority?: number,
-  minSpatial?: number,
-  maxSpatial?: number,
-  minTemporal?: number,
-  maxTemporal?: number,
-) => {
+export const useConsumerPair = (peerId: string, audioName: string, videoName: string, limit?: StreamLimit) => {
   const consumerId = useMemo(() => idSeed++, []);
   const { getConsumerPair, backConsumerPair } = useContext(SessionContext);
   const consumer = useMemo(() => {
@@ -90,7 +64,7 @@ export const useConsumerPair = (
   }, [peerId, audioName, videoName]);
 
   useEffect(() => {
-    consumer.view('use-consumer-' + consumerId, priority, minSpatial, maxSpatial, minTemporal, maxTemporal);
+    consumer.view('use-consumer-' + consumerId, limit);
     return () => {
       consumer.unview('use-consumer-' + consumerId);
       backConsumerPair(consumerId, peerId, audioName, videoName);
@@ -103,7 +77,7 @@ export const useConsumerPair = (
         case StreamReceiverState.Connecting:
           break;
         default:
-          consumer.limit('use-consumer-' + consumerId, priority, minSpatial, maxSpatial, minTemporal, maxTemporal);
+          if (limit) consumer.limit('use-consumer-' + consumerId, limit);
       }
     };
     handler(consumer.state);
@@ -112,7 +86,7 @@ export const useConsumerPair = (
     return () => {
       consumer.off('state', handler);
     };
-  }, [consumer, priority, minSpatial, maxSpatial, minTemporal, maxTemporal]);
+  }, [consumer, limit]);
 
   return consumer;
 };
