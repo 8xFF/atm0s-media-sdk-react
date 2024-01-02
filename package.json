@@ -70,7 +70,7 @@
   },
   "homepage": "https://github.com/8xff/media-sdk-react#readme",
   "peerDependencies": {
-    "@8xff/atm0s-media-js": "0.1.3-alpha.6",
+    "@8xff/atm0s-media-js": ">=0.1.3-alpha",
     "@types/react": ">=16",
     "react": ">=16"
   }
