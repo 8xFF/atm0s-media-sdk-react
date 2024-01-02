@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import React, { type MediaHTMLAttributes } from 'react';
-import { StreamRemote, StreamConsumer, StreamConsumerPair } from '@8xff/atm0s-media-js';
+import { StreamRemote, StreamConsumer, StreamConsumerPair, type StreamLimit } from '@8xff/atm0s-media-js';
 import { DataContainer } from '../hooks/reaction';
 import { MediaStreamArc } from '../hooks/shared_device';
 import type { MediaStream2 } from './device';
@@ -77,21 +77,10 @@ export const useStreamConnectHTMLElement = (stream?: MediaStream2) => {
 export const RemoteViewer = (
   props: MediaHTMLAttributes<HTMLVideoElement> & {
     stream: StreamRemote;
-    priority?: number;
-    minSpatial?: number;
-    maxSpatial?: number;
-    minTemporal?: number;
-    maxTemporal?: number;
+    limit?: StreamLimit;
   },
 ) => {
-  const consumer = useConsumer(
-    props.stream,
-    props.priority,
-    props.minSpatial,
-    props.maxSpatial,
-    props.minTemporal,
-    props.maxTemporal,
-  );
+  const consumer = useConsumer(props.stream, props.limit);
   const ref = useConsumerConnectHTMLElement(consumer);
   return (
     <video muted autoPlay ref={ref} {...props}>
