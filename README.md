@@ -11,10 +11,10 @@
 This library is published in the NPM registry and can be installed using any compatible package manager.
 
 ```sh
-npm install @8xff/atm0s-media-react --save
+npm install @8xff/atm0s-media-react@alpha @8xff/atm0s-media-js@alpha --save
 
 # For Yarn, use the command below.
-yarn add @8xff/atm0s-media-react
+yarn add @8xff/atm0s-media-react@alpha @8xff/atm0s-media-js@alpha
 ```
 
 ### Installation from CDN
