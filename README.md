@@ -1,4 +1,4 @@
-# Atm0s React SDK
+# Atm0s React SDK (legacy version)
 
 [![Continuous Integrations](https://github.com/8xff/media-sdk-react/actions/workflows/continuous-integrations.yaml/badge.svg?branch=main)](https://github.com/8xff/media-sdk-react/actions/workflows/continuous-integrations.yaml)
 [![License](https://badgen.net/github/license/8xff/media-sdk-react)](./LICENSE)
